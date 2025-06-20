@@ -1,304 +1,455 @@
-# Generated Java Springboot Code for Milestone Management Service
+# Low-Level Design (LLD): Milestone Management Service
+
+## Objective
+
+To design and implement a robust, scalable, and maintainable Milestone Management Service using Spring Boot. The service will support the following functionalities:
+- Create a milestone
+- Associate a milestone with a release
+- Close a milestone
+- View milestone details (by ID, by filters)
+
+This LLD consolidates all requirements and business logic from the latest user stories and previous designs, ensuring a production-ready, developer-friendly specification.
 
 ---
 
-## 1. Domain Models & Repository Interfaces
+## 1. API Model
 
+### 1.1. API Endpoints
+
+#### 1.1.1. Create Milestone
+- **URL:** `/api/v1/milestones`
+- **Method:** `POST`
+- **Request Body:**
+```json
+{
+  "name": "string (required, unique per project)",
+  "description": "string (optional)",
+  "startDate": "yyyy-MM-dd (required)",
+  "endDate": "yyyy-MM-dd (required, must be after startDate)",
+  "projectId": "UUID (required)"
+}
+```
+- **Response:**
+```json
+{
+  "id": "UUID",
+  "name": "string",
+  "description": "string",
+  "startDate": "yyyy-MM-dd",
+  "endDate": "yyyy-MM-dd",
+  "status": "OPEN",
+  "projectId": "UUID"
+}
+```
+- **Validations:**
+  - Name is required and unique within the project.
+  - startDate and endDate are required; endDate must be after startDate.
+
+#### 1.1.2. Associate Milestone with Release
+- **URL:** `/api/v1/milestones/{milestoneId}/associate-release`
+- **Method:** `POST`
+- **Request Body:**
+```json
+{
+  "releaseId": "UUID (required)"
+}
+```
+- **Response:**
+```json
+{
+  "milestoneId": "UUID",
+  "releaseId": "UUID",
+  "associationStatus": "SUCCESS"
+}
+```
+- **Validations:**
+  - Both milestone and release must exist.
+  - Milestone must be in OPEN status.
+
+#### 1.1.3. Close Milestone
+- **URL:** `/api/v1/milestones/{milestoneId}/close`
+- **Method:** `POST`
+- **Request Body:** _None_
+- **Response:**
+```json
+{
+  "milestoneId": "UUID",
+  "status": "CLOSED"
+}
+```
+- **Validations:**
+  - Milestone must exist and be in OPEN status.
+  - All associated releases must be in RELEASED status.
+  - Cannot close a milestone already CLOSED.
+
+#### 1.1.4. View Milestone Details
+- **URL:** `/api/v1/milestones/{milestoneId}`
+- **Method:** `GET`
+- **Response:**
+```json
+{
+  "id": "UUID",
+  "name": "string",
+  "description": "string",
+  "startDate": "yyyy-MM-dd",
+  "endDate": "yyyy-MM-dd",
+  "status": "OPEN|CLOSED",
+  "projectId": "UUID",
+  "associatedReleases": [
+    {
+      "releaseId": "UUID",
+      "releaseName": "string",
+      "status": "PLANNED|RELEASED"
+    }
+  ]
+}
+```
+- **Validations:**
+  - Milestone must exist.
+
+#### 1.1.5. List/View Milestones (by filters)
+- **URL:** `/api/v1/milestones`
+- **Method:** `GET`
+- **Query Params:**
+  - `projectId` (optional)
+  - `status` (optional: OPEN, CLOSED)
+  - `startDate`, `endDate` (optional, filter by date range)
+- **Response:**
+```json
+[
+  {
+    "id": "UUID",
+    "name": "string",
+    "status": "OPEN|CLOSED",
+    "startDate": "yyyy-MM-dd",
+    "endDate": "yyyy-MM-dd"
+  }
+]
+```
+
+---
+
+### 1.2. Exception Handling
+
+| Exception Code | HTTP Status | Description |
+|----------------|-------------|-------------|
+| MILESTONE_NOT_FOUND | 404 | Milestone does not exist |
+| MILESTONE_ALREADY_CLOSED | 400 | Attempt to close an already closed milestone |
+| MILESTONE_NAME_DUPLICATE | 400 | Milestone name already exists in project |
+| INVALID_DATE_RANGE | 400 | End date is before start date |
+| RELEASE_NOT_FOUND | 404 | Release does not exist |
+| INVALID_ASSOCIATION | 400 | Cannot associate milestone with release |
+| MILESTONE_CLOSE_BLOCKED | 400 | All associated releases must be RELEASED before closing milestone |
+
+---
+
+## 2. Functional Design
+
+### 2.1. Class Diagram (Descriptive)
+
+- **MilestoneController**: Handles REST API requests.
+- **MilestoneService**: Business logic for milestone operations.
+- **MilestoneRepository**: JPA repository for Milestone entity.
+- **ReleaseService**: For release validation and status fetching.
+- **Milestone**: Entity representing a milestone.
+- **Release**: Entity representing a release (external or internal reference).
+- **MilestoneReleaseAssociation**: Entity for many-to-many relationship.
+- **MilestoneDTO / CreateMilestoneRequest / MilestoneResponse**: DTOs for API communication.
+- **Custom Exceptions**: For business rule violations.
+
+### 2.2. Sequence Diagrams (Descriptive)
+
+#### 2.2.1. Create Milestone
+1. `MilestoneController.createMilestone()` receives request.
+2. Validates input (name uniqueness, date range).
+3. Calls `MilestoneService.createMilestone()`.
+4. Persists Milestone via `MilestoneRepository`.
+5. Returns created milestone DTO.
+
+#### 2.2.2. Associate Milestone with Release
+1. `MilestoneController.associateRelease()` receives request.
+2. Validates milestone and release existence, milestone status.
+3. Calls `MilestoneService.associateRelease()`.
+4. Persists association in `MilestoneReleaseAssociation`.
+5. Returns association result.
+
+#### 2.2.3. Close Milestone
+1. `MilestoneController.closeMilestone()` receives request.
+2. Validates milestone existence, status, and associated releases' statuses.
+3. Calls `MilestoneService.closeMilestone()`.
+4. Updates milestone status to CLOSED.
+5. Returns updated milestone DTO.
+
+#### 2.2.4. View Milestone
+1. `MilestoneController.getMilestone()` receives request.
+2. Fetches milestone and associated releases.
+3. Returns milestone DTO with associations.
+
+### 2.3. Component Overview
+- **Controller Layer**: REST endpoints, request/response mapping, input validation.
+- **Service Layer**: Business logic, transactional boundaries, orchestration.
+- **Repository Layer**: JPA/Hibernate for persistence.
+- **DTOs**: Decouple API models from entities.
+- **Exception Handling**: @ControllerAdvice for global error mapping.
+
+### 2.4. Validations
+- Name uniqueness per project (DB and service level).
+- Date range: endDate > startDate.
+- Milestone status transitions: OPEN → CLOSED only if all releases are RELEASED.
+- Association only if milestone is OPEN.
+
+---
+
+## 3. Integrations
+- **Release Service**: Validate release existence and fetch status (REST or Feign client).
+- **Project Service**: Validate project existence if required.
+- **Authentication/Authorization**: All endpoints secured with JWT/OAuth2; only authorized users can create/close/associate milestones.
+
+---
+
+## 4. Database Details
+
+### 4.1. Entity-Relationship (ER) Model
+
+#### Tables
+- **milestone**
+  - id (UUID, PK)
+  - name (VARCHAR, unique per project)
+  - description (TEXT)
+  - start_date (DATE)
+  - end_date (DATE)
+  - status (ENUM: OPEN, CLOSED)
+  - project_id (UUID, FK)
+  - created_at (TIMESTAMP)
+  - updated_at (TIMESTAMP)
+
+- **release** (reference/external table)
+  - id (UUID, PK)
+  - name (VARCHAR)
+  - status (ENUM: PLANNED, RELEASED)
+
+- **milestone_release_association**
+  - id (UUID, PK)
+  - milestone_id (UUID, FK)
+  - release_id (UUID, FK)
+  - created_at (TIMESTAMP)
+
+#### Relationships
+- milestone 1---* milestone_release_association *---1 release
+- milestone *---1 project
+
+### 4.2. DB Validations
+- Unique constraint: (project_id, name) on milestone
+- Foreign key constraints: milestone.project_id, milestone_release_association.milestone_id, milestone_release_association.release_id
+- status ENUM constraints
+- Non-null constraints on required fields
+
+---
+
+## 5. Dependencies
+- Spring Boot 3.x
+- Spring Data JPA
+- Spring Web
+- Spring Security (JWT/OAuth2)
+- Lombok
+- MapStruct (for DTO mapping)
+- Feign/OpenFeign (for service-to-service calls)
+- PostgreSQL (or compatible RDBMS)
+
+---
+
+## 6. Assumptions
+- Release and Project entities/services exist and are accessible via REST APIs.
+- User authentication and authorization are handled globally.
+- Milestone names are unique within a project.
+- Milestone can only be closed if all associated releases are in RELEASED status.
+- All date and time values are in UTC.
+- Soft deletes are not required; hard deletes are not supported for milestones.
+
+---
+
+## 7. DTO and Entity Models (Java-style)
+
+### 7.1. Milestone Entity
 ```java
-package com.example.milestonemanagement.model;
+package com.example.project.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.index.Indexed;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import java.time.Instant;
-import java.util.List;
-
-/**
- * Milestone domain model.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Document(collection = "milestone")
-public class Milestone {
-    @Id
-    private String id;
-
-    @NotBlank
-    @Size(max = 100)
-    @Indexed(unique = true)
-    private String name;
-
-    @Size(max = 500)
-    private String description;
-
-    @NotNull
-    private Instant startDate;
-
-    @NotNull
-    private Instant endDate;
-
-    @NotNull
-    private MilestoneStatus status;
-
-    private List<String> tags;
-
-    private Instant createdAt;
-    private Instant updatedAt;
-}
-
-/**
- * Enum for Milestone status.
- */
-enum MilestoneStatus {
-    PLANNED,
-    IN_PROGRESS,
-    COMPLETED,
-    CANCELLED
-}
-
-/**
- * MilestoneReleaseAssociation domain model.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Document(collection = "milestone_release_association")
-public class MilestoneReleaseAssociation {
-    @Id
-    private String id;
-
-    @NotBlank
-    private String milestoneId;
-
-    @NotBlank
-    private String releaseId;
-
-    @NotNull
-    private Instant associatedAt;
-}
-```
-
----
-
-```java
-package com.example.milestonemanagement.repository;
-
-import com.example.milestonemanagement.model.Milestone;
-import com.example.milestonemanagement.model.MilestoneReleaseAssociation;
-import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-
-@Repository
-public interface MilestoneRepository extends MongoRepository<Milestone, String> {
-    List<Milestone> findByStatus(MilestoneStatus status);
-    List<Milestone> findByNameContainingIgnoreCase(String name);
-}
-
-@Repository
-public interface MilestoneReleaseAssociationRepository extends MongoRepository<MilestoneReleaseAssociation, String> {
-    List<MilestoneReleaseAssociation> findByMilestoneId(String milestoneId);
-    List<MilestoneReleaseAssociation> findByReleaseId(String releaseId);
-}
-```
-
----
-
-## 2. DTOs
-
-```java
-package com.example.milestone.model.dto;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.FutureOrPresent;
-import jakarta.validation.constraints.PastOrPresent;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Request DTO for creating a new Milestone.
- */
+@Document(collection = "milestones")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Milestone {
+    @Id
+    private UUID id;
+
+    private String name;
+
+    private String description;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
+
+    private MilestoneStatus status;
+
+    private UUID projectId;
+
+    @DBRef
+    private List<MilestoneReleaseAssociation> associations;
+}
+```
+
+### 7.2. MilestoneReleaseAssociation Entity
+```java
+package com.example.project.entity;
+
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Document(collection = "milestone_release_associations")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MilestoneReleaseAssociation {
+    @Id
+    private UUID id;
+
+    @DBRef
+    private Milestone milestone;
+
+    private UUID releaseId;
+
+    private LocalDateTime createdAt;
+}
+```
+
+### 7.3. MilestoneStatus Enum
+```java
+package com.example.project.entity;
+
+public enum MilestoneStatus {
+    NOT_STARTED,
+    IN_PROGRESS,
+    COMPLETED,
+    ON_HOLD,
+    CANCELLED
+}
+```
+
+### 7.4. CreateMilestoneRequest DTO
+```java
+package com.example.project.dto;
+
+import lombok.*;
+import jakarta.validation.constraints.*;
+import java.time.LocalDate;
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateMilestoneRequest {
-
-    /**
-     * Name of the milestone.
-     */
-    @NotBlank(message = "Milestone name is required.")
-    @Size(max = 100, message = "Milestone name must not exceed 100 characters.")
+    @NotBlank
     private String name;
 
-    /**
-     * Description of the milestone.
-     */
-    @Size(max = 500, message = "Description must not exceed 500 characters.")
     private String description;
 
-    /**
-     * Planned start date for the milestone.
-     */
-    @NotNull(message = "Start date is required.")
-    @PastOrPresent(message = "Start date cannot be in the future.")
+    @NotNull
     private LocalDate startDate;
 
-    /**
-     * Planned end date for the milestone.
-     */
-    @NotNull(message = "End date is required.")
-    @FutureOrPresent(message = "End date cannot be in the past.")
+    @NotNull
     private LocalDate endDate;
 
-    /**
-     * Associated release information (optional).
-     */
-    private AssociatedReleaseDTO associatedRelease;
+    @NotNull
+    private UUID projectId;
 }
+```
 
-/**
- * DTO representing an associated release for a milestone.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AssociatedReleaseDTO {
+### 7.5. MilestoneResponse DTO
+```java
+package com.example.project.dto;
 
-    /**
-     * Unique identifier for the release.
-     */
-    @NotBlank(message = "Release ID is required.")
-    private String releaseId;
+import lombok.*;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import com.example.project.entity.MilestoneStatus;
 
-    /**
-     * Name of the associated release.
-     */
-    @NotBlank(message = "Release name is required.")
-    @Size(max = 100, message = "Release name must not exceed 100 characters.")
-    private String releaseName;
-}
-
-/**
- * Response DTO for Milestone details.
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class MilestoneResponse {
-
-    /**
-     * Unique identifier for the milestone.
-     */
-    @NotBlank
-    private String id;
-
-    /**
-     * Name of the milestone.
-     */
+    private UUID id;
     private String name;
-
-    /**
-     * Description of the milestone.
-     */
     private String description;
-
-    /**
-     * Planned start date for the milestone.
-     */
     private LocalDate startDate;
-
-    /**
-     * Planned end date for the milestone.
-     */
     private LocalDate endDate;
-
-    /**
-     * Associated release information.
-     */
-    private AssociatedReleaseDTO associatedRelease;
-
-    /**
-     * Current status of the milestone (e.g., PLANNED, IN_PROGRESS, COMPLETED).
-     */
-    private String status;
+    private MilestoneStatus status;
+    private UUID projectId;
+    private List<AssociatedReleaseDTO> associatedReleases;
 }
+```
 
-/**
- * DTO for filtering milestones in search/list APIs.
- */
+### 7.6. AssociatedReleaseDTO
+```java
+package com.example.project.dto;
+
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MilestoneFilterRequest {
-
-    /**
-     * Filter milestones by status.
-     */
-    private String status;
-
-    /**
-     * Filter milestones by associated release ID.
-     */
-    private String releaseId;
-
-    /**
-     * Filter milestones that start after this date.
-     */
-    private LocalDate startDateFrom;
-
-    /**
-     * Filter milestones that end before this date.
-     */
-    private LocalDate endDateTo;
-}
-
-/**
- * Response DTO for paginated milestone search results.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class MilestoneListResponse {
-
-    /**
-     * List of milestones matching the filter.
-     */
-    @NotNull
-    private List<MilestoneResponse> milestones;
-
-    /**
-     * Total number of milestones matching the filter.
-     */
-    private long totalCount;
+public class AssociatedReleaseDTO {
+    private UUID id;
+    private UUID releaseId;
+    private LocalDateTime createdAt;
 }
 ```
 
 ---
 
-**Code Creation Completed**
+## 8. Service Layer Methods (Java-style)
 
-> The absolute path to the generated file is: `./JavaCode.md`
+```java
+public interface MilestoneService {
+    MilestoneResponse createMilestone(CreateMilestoneRequest request);
+    void associateRelease(UUID milestoneId, UUID releaseId);
+    MilestoneResponse closeMilestone(UUID milestoneId);
+    MilestoneResponse getMilestone(UUID milestoneId);
+    List<MilestoneResponse> listMilestones(MilestoneFilter filter);
+}
+```
+
+---
+
+## 9. Sequence Diagram: Close Milestone (Descriptive)
+1. User calls `POST /api/v1/milestones/{milestoneId}/close`.
+2. Controller validates milestone exists and is OPEN.
+3. Service fetches all associated releases.
+4. Service checks all releases are in RELEASED status.
+5. If valid, milestone status set to CLOSED and saved.
+6. Response returned with updated status.
+
+---
+
+## 10. Summary
+This LLD provides a unified, production-ready design for Milestone Management in Spring Boot, covering all required user stories and technical constraints. It is ready for direct implementation by backend developers.

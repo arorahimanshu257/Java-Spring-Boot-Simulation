@@ -1,0 +1,304 @@
+# Generated Java Springboot Code for Milestone Management Service
+
+---
+
+## 1. Domain Models & Repository Interfaces
+
+```java
+package com.example.milestonemanagement.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Milestone domain model.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "milestone")
+public class Milestone {
+    @Id
+    private String id;
+
+    @NotBlank
+    @Size(max = 100)
+    @Indexed(unique = true)
+    private String name;
+
+    @Size(max = 500)
+    private String description;
+
+    @NotNull
+    private Instant startDate;
+
+    @NotNull
+    private Instant endDate;
+
+    @NotNull
+    private MilestoneStatus status;
+
+    private List<String> tags;
+
+    private Instant createdAt;
+    private Instant updatedAt;
+}
+
+/**
+ * Enum for Milestone status.
+ */
+enum MilestoneStatus {
+    PLANNED,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED
+}
+
+/**
+ * MilestoneReleaseAssociation domain model.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "milestone_release_association")
+public class MilestoneReleaseAssociation {
+    @Id
+    private String id;
+
+    @NotBlank
+    private String milestoneId;
+
+    @NotBlank
+    private String releaseId;
+
+    @NotNull
+    private Instant associatedAt;
+}
+```
+
+---
+
+```java
+package com.example.milestonemanagement.repository;
+
+import com.example.milestonemanagement.model.Milestone;
+import com.example.milestonemanagement.model.MilestoneReleaseAssociation;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface MilestoneRepository extends MongoRepository<Milestone, String> {
+    List<Milestone> findByStatus(MilestoneStatus status);
+    List<Milestone> findByNameContainingIgnoreCase(String name);
+}
+
+@Repository
+public interface MilestoneReleaseAssociationRepository extends MongoRepository<MilestoneReleaseAssociation, String> {
+    List<MilestoneReleaseAssociation> findByMilestoneId(String milestoneId);
+    List<MilestoneReleaseAssociation> findByReleaseId(String releaseId);
+}
+```
+
+---
+
+## 2. DTOs
+
+```java
+package com.example.milestone.model.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.PastOrPresent;
+import java.time.LocalDate;
+import java.util.List;
+
+/**
+ * Request DTO for creating a new Milestone.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CreateMilestoneRequest {
+
+    /**
+     * Name of the milestone.
+     */
+    @NotBlank(message = "Milestone name is required.")
+    @Size(max = 100, message = "Milestone name must not exceed 100 characters.")
+    private String name;
+
+    /**
+     * Description of the milestone.
+     */
+    @Size(max = 500, message = "Description must not exceed 500 characters.")
+    private String description;
+
+    /**
+     * Planned start date for the milestone.
+     */
+    @NotNull(message = "Start date is required.")
+    @PastOrPresent(message = "Start date cannot be in the future.")
+    private LocalDate startDate;
+
+    /**
+     * Planned end date for the milestone.
+     */
+    @NotNull(message = "End date is required.")
+    @FutureOrPresent(message = "End date cannot be in the past.")
+    private LocalDate endDate;
+
+    /**
+     * Associated release information (optional).
+     */
+    private AssociatedReleaseDTO associatedRelease;
+}
+
+/**
+ * DTO representing an associated release for a milestone.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AssociatedReleaseDTO {
+
+    /**
+     * Unique identifier for the release.
+     */
+    @NotBlank(message = "Release ID is required.")
+    private String releaseId;
+
+    /**
+     * Name of the associated release.
+     */
+    @NotBlank(message = "Release name is required.")
+    @Size(max = 100, message = "Release name must not exceed 100 characters.")
+    private String releaseName;
+}
+
+/**
+ * Response DTO for Milestone details.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MilestoneResponse {
+
+    /**
+     * Unique identifier for the milestone.
+     */
+    @NotBlank
+    private String id;
+
+    /**
+     * Name of the milestone.
+     */
+    private String name;
+
+    /**
+     * Description of the milestone.
+     */
+    private String description;
+
+    /**
+     * Planned start date for the milestone.
+     */
+    private LocalDate startDate;
+
+    /**
+     * Planned end date for the milestone.
+     */
+    private LocalDate endDate;
+
+    /**
+     * Associated release information.
+     */
+    private AssociatedReleaseDTO associatedRelease;
+
+    /**
+     * Current status of the milestone (e.g., PLANNED, IN_PROGRESS, COMPLETED).
+     */
+    private String status;
+}
+
+/**
+ * DTO for filtering milestones in search/list APIs.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MilestoneFilterRequest {
+
+    /**
+     * Filter milestones by status.
+     */
+    private String status;
+
+    /**
+     * Filter milestones by associated release ID.
+     */
+    private String releaseId;
+
+    /**
+     * Filter milestones that start after this date.
+     */
+    private LocalDate startDateFrom;
+
+    /**
+     * Filter milestones that end before this date.
+     */
+    private LocalDate endDateTo;
+}
+
+/**
+ * Response DTO for paginated milestone search results.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MilestoneListResponse {
+
+    /**
+     * List of milestones matching the filter.
+     */
+    @NotNull
+    private List<MilestoneResponse> milestones;
+
+    /**
+     * Total number of milestones matching the filter.
+     */
+    private long totalCount;
+}
+```
+
+---
+
+**Code Creation Completed**
+
+> The absolute path to the generated file is: `./JavaCode.md`

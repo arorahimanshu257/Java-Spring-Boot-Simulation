@@ -1,14 +1,12 @@
 package com.example.project.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
-import java.util.List;
+import jakarta.validation.constraints.*;
 
 @Entity
-@Table(name = "releases")
+@Table(name = "release", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tag", "project_id"})
+})
 public class Release {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,49 +14,32 @@ public class Release {
 
     @NotBlank
     @Size(max = 100)
-    @Column(nullable = false, length = 100)
-    private String name;
+    private String tag;
 
-    @Size(max = 255)
-    @Column(length = 255)
+    @Size(max = 1000)
     private String description;
 
     @NotNull
-    @Column(nullable = false)
-    private LocalDate releaseDate;
+    @Column(name = "project_id")
+    private Long projectId;
 
-    @OneToMany(mappedBy = "release", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Milestone> milestones;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "milestone_id", referencedColumnName = "id", nullable = true)
+    private Milestone milestone;
 
     // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-    public void setId(Long id) {
-        this.id = id;
-    }
-    public String getName() {
-        return name;
-    }
-    public void setName(String name) {
-        this.name = name;
-    }
-    public String getDescription() {
-        return description;
-    }
-    public void setDescription(String description) {
-        this.description = description;
-    }
-    public LocalDate getReleaseDate() {
-        return releaseDate;
-    }
-    public void setReleaseDate(LocalDate releaseDate) {
-        this.releaseDate = releaseDate;
-    }
-    public List<Milestone> getMilestones() {
-        return milestones;
-    }
-    public void setMilestones(List<Milestone> milestones) {
-        this.milestones = milestones;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public Long getProjectId() { return projectId; }
+    public void setProjectId(Long projectId) { this.projectId = projectId; }
+
+    public Milestone getMilestone() { return milestone; }
+    public void setMilestone(Milestone milestone) { this.milestone = milestone; }
 }

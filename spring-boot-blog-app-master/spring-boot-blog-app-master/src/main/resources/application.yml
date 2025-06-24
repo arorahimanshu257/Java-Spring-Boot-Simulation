@@ -1,0 +1,52 @@
+spring:
+    application:
+        name: Seed App - An example of professional spring project
+    profiles:
+        # The commented value for `active` can be replaced with valid spring profiles to load.
+        # Otherwise, it will be filled in by maven when building the WAR file
+        # Either way, it can be overridden by `--spring.profiles.active` value passed in the commandline or `-Dspring.profiles.active` set in `JAVA_OPTS`
+        active: '@spring.profiles.active@'
+    jpa:
+        show-sql: false
+        open-in-view: false
+        properties:
+            hibernate.globally_quoted_identifiers: true
+    mail:
+        host: localhost
+        port: ${MAILHOG_PORT:1025}
+        username:
+        password:
+    main:
+        lazy-initialization: false
+    threads:
+        virtual:
+            enabled: true
+server:
+    port: 8080
+
+logging.level:
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.springframework.security.web: INFO
+    org.hibernate: INFO
+    ROOT: INFO
+    gt: DEBUG
+
+
+wro4j:
+    jmx-enabled: false
+    debug: true
+    manager-factory:
+        pre-processors:  removeSourceMaps, cssUrlRewriting, cssImport, cssMinJawr, semicolonAppender, jsMin
+    filter-url: /wro4j # this is the default, needs to be used in secConfig and the htmls
+
+
+# custom properties for this project
+app-properties:
+    file-storage:
+        upload-folder: ${java.io.tmpdir}
+
+
+spring-doc:
+    show-actuator: true
+

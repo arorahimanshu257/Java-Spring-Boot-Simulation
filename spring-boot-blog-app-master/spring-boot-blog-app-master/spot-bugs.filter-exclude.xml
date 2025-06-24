@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<FindBugsFilter>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+    <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
+
+    <Class name="~.*.*SpringCGLIB.*.*" />
+</FindBugsFilter>

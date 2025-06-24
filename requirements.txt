@@ -1,0 +1,19 @@
+uvicorn==0.32.0
+httpx==0.27.2
+crewai==0.130.0
+langfuse==2.53.9
+redis==5.2.0
+boto3==1.35.63
+chardet==5.2.0
+python-multipart==0.0.19
+chromadb-client==0.5.20
+setuptools==80.9.0
+crewai-tools==0.47.1
+psycopg2-binary==2.9.10
+tika==2.6.0
+azure-storage-blob==12.25.1
+pymongo==4.13.1
+cx_oracle==8.3.0
+mysql-connector-python==9.3.0
+# make sure to pip install langchain-google-vertexai (separately due to conflict)
+

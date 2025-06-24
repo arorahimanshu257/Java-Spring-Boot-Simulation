@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity5"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head th:fragment="head(title, links)">
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+    <meta content="" name="description">
+    <meta content="" name="author">
+    <meta content="" name="generator">
+    <title th:replace="${title}"> Title ...</title>
+
+    <link href="/webjars/bootstrap/4.5.0/css/bootstrap.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/static/css/wro-commons.css}"/>
+
+    <th:block th:replace="${links}"/>
+
+</head>
+<body>
+
+<div th:fragment="headerbar">
+
+    <nav class="navbar navbar-dark bg-dark navbar-expand-md bg-faded justify-content-center">
+        <a class="navbar-brand d-flex w-50 mr-auto" th:href="@{/}"><span>Note App</span></a>
+
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsingNavbar3">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-collapse collapse w-100" id="collapsingNavbar3">
+
+            <ul class="nav navbar-nav ml-auto w-100 justify-content-end">
+                <li class="nav-item" sec:authorize="isAuthenticated()">
+
+                    <a class="p-2" th:href="@{/note}" id="user-note-link">
+                        <span sec:authentication="name">Notes</span>'s Notes
+                    </a>
+                </li>
+                <li class="nav-item" sec:authorize="isAnonymous()">
+                    <a class="nav-link " th:href="@{/login}" id="login-link">
+                        Login
+                    </a>
+                </li>
+
+                <li class="nav-item" sec:authorize="isAnonymous()">
+                    <a class="nav-link " th:href="@{/signup}" id="signup-link">
+                        Signup
+                    </a>
+                </li>
+            </ul>
+
+            <ul class="nav navbar-nav ml-auto w-100 justify-content-end" sec:authorize="isAuthenticated()">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle " href="#" id="navbarDropdownMenuLink" data-toggle="dropdown">
+                        <span sec:authentication="principal.username">USER_NAME</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" th:href="@{/password}" id="change-password-link">
+                            Change Password
+                        </a>
+                        <a class="dropdown-item" th:href="@{/profile}" id="profile-link">
+                            Profile
+                        </a>
+                        <a class="dropdown-item" th:href="@{/auth/logout}" id="logout-link">
+                            Logout
+                        </a>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+</div>
+
+</body>
+</html>
+

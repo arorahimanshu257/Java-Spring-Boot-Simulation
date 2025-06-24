@@ -1,0 +1,27 @@
+spring:
+    thymeleaf:
+        cache: false
+        prefix: file:src/main/resources/templates/  #directly serve from src folder instead of target
+    web:
+        resources:
+            static-locations:
+                - file:src/main/resources/static/ #directly serve from src folder instead of target
+                - classpath:/META-INF/resources/
+                - classpath:/resources/
+                - classpath:/static/
+                - classpath:/public/
+            cache:
+                period: 0
+    mvc:
+        static-path-pattern: /static/**
+    jpa:
+        show-sql: false
+    datasource:
+        url: jdbc:h2:mem:testdb
+    h2: #dev uses H2 and 'emailhog' docker container from docker-compose
+        console:
+            enabled: true #Access from http://localhost:8080/h2-console/
+    docker:
+        compose:
+            profiles:
+                active: mailHog

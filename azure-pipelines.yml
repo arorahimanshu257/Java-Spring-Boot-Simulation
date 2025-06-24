@@ -1,0 +1,110 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+
+trigger: none
+
+schedules:
+  - cron: "0 */6 * * *"  # Run at 00:00, 06:00, 12:00, 18:00 UTC every day
+    displayName: "Every 6 hours deployment"
+    branches:
+      include:
+        - development
+
+variables:
+  AZURE_ACR_IMAGE_REPO: ascdev
+  helmChartPath: './helm/da-api-platform-pipeline-dev'
+  helmReleaseName: 'force-platform-api-pipeline'
+  helmNamespace: 'da'
+  PAT_TOKEN: $(pat-token)
+  USER_NAME: $(username)
+  IMAGE_TAG: $(Build.BuildId)
+  # Branch variables
+  TARGET_BRANCH: 'deploy-dev'
+
+resources:
+  repositories:
+    - repository: self
+
+stages:
+  - stage: Build
+    displayName: Build and Push Docker Image
+    jobs:
+      - job: Build
+        displayName: Build and Push
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          # Step 1: Checkout the application code repository
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - script: |
+              git config --global user.email "ascendion.devops@ascendion.com"
+              git config --global user.name "Ascendion Devops"
+              git clone https://$(USER_NAME):$(PAT_TOKEN)@dev.azure.com/ascendionava/AVA/_git/force-platform-api-pipeline helmCharts
+            displayName: 'Clone Repository'
+
+          # Step 2: Verify the contents of the repositories
+          - script: |
+              echo "Listing contents of application code repository:"
+              ls -lrt $(Build.SourcesDirectory)
+              echo "Listing contents of Helm chart repository:"
+              ls -lrt $(Build.SourcesDirectory)/helmCharts
+            displayName: 'List repository contents'
+
+          - script: |
+              # Get current date in ddmmyyyyhhmmss format
+              echo "##vso[task.setvariable variable=IMAGE_TAG]$(date +'%m%d%Y%H%M')"
+            displayName: 'Set IMAGE_TAG to current date-time'
+
+
+          # Docker build and push steps remain same...
+           # Step 3: Build Docker image and push to Azure Container Registry (ACR)
+          - task: Docker@2
+            displayName: 'Build and Push Docker Image'
+            inputs:
+              containerRegistry: 'Ascendion-ACR'  # Name of the service connection to ACR
+              repository: '$(AZURE_ACR_IMAGE_REPO)/$(Build.Repository.Name)'  # Docker repository path
+              command: 'buildAndPush'
+              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'  # Path to the Dockerfile
+              buildContext: $(Build.SourcesDirectory)  # Context for Docker build
+              tags: |
+                $(IMAGE_TAG)
+
+          # Step 4: Push the image tag in deply-dev branch for argocd deployment
+          - script: |
+              cd $(Build.SourcesDirectory)/helmCharts
+              # Create and checkout new temporary branch from development
+              git checkout $(TARGET_BRANCH)
+
+              # Make changes in temporary branch
+              sed -i "s/tag: .*/tag: \"$(IMAGE_TAG)\"/" $(helmChartPath)/values.yaml
+
+              # Commit and push temporary branch
+              git add $(helmChartPath)/values.yaml
+              git config user.name "Ascendion Devops"
+              git config user.email "ascendion.devops@ascendion.com"
+              git commit -m "Update image tag to $(IMAGE_TAG)"
+              git push origin $(TARGET_BRANCH)
+            displayName: 'Update and Push to Temporary Branch'
+
+           # Prepare Analysis Configuration task
+          - task: SonarQubePrepare@7
+            inputs:
+              SonarQube: 'sonarqube_scan'
+              scannerMode: 'cli'
+              configMode: 'manual'
+              cliProjectKey: 'AVA_force-platform-api-pipeline_eb8f3808-4ae2-425a-a8b6-cffad3d4349a'
+
+          # Run Code Analysis task
+          - task: SonarQubeAnalyze@7
+            inputs:
+              jdkversion: 'JAVA_HOME_17_X64'
+
+          # Publish Quality Gate Result task
+          - task: SonarQubePublish@7
+            inputs:
+              pollingTimeoutSec: '300'

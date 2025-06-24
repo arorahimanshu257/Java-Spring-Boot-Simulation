@@ -1,0 +1,12 @@
+*.pyc
+*.DS_Store
+*.pkl
+.env
+env/
+.venv/
+redis_test.py
+__pycache__/
+.vscode/
+test.py
+app/
+segregated_output/
